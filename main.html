@@ -50,3 +50,398 @@
           <option value="2" selected>2</option>
           <option value="3">3</option>
         </select>
+      </label>
+      <button id="btnNew">New Game</button>
+      <button id="btnUndo" class="secondary">Undo</button>
+      <button id="btnResign" class="secondary">Resign</button>
+    </div>
+
+    <div class="status" id="status">Status: Ready</div>
+
+    <div class="log" id="movelog" aria-live="polite"></div>
+  </div>
+
+  <div class="right">
+    <h2>Controls & Info</h2>
+    <div class="small muted">Drag pieces to move. Legal moves and checks are enforced. The AI uses a short minimax search with a material and simple positional evaluation. Increase AI depth for stronger play.</div>
+
+    <h3 style="margin-top:12px">Game Info</h3>
+    <div class="small" id="turnInfo">Turn: White</div>
+    <div style="height:12px"></div>
+
+    <h3>Move List</h3>
+    <div class="log" id="moves">No moves yet.</div>
+
+    <h3 style="margin-top:12px">Legend</h3>
+    <div class="small muted">
+      - Use New Game to restart. <br>
+      - Undo reverts last ply (human or AI). <br>
+      - Resign ends the game immediately in favor of the opponent.
+    </div>
+  </div>
+</div>
+
+<!-- chess.js and chessboard.js from CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0/chess.min.js"></script>
+<script src="https://unpkg.com/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+
+<script>
+/*
+  Chess vs AI single-file app
+  - Uses chess.js for rules and move generation
+  - Uses chessboard.js for UI
+  - Simple AI: minimax with alpha-beta, material + piece-square heuristic
+  - White/Black piece colors are standard: white pieces appear light, black pieces dark
+*/
+
+const boardElement = document.getElementById('board');
+const statusEl = document.getElementById('status');
+const movelogEl = document.getElementById('movelog');
+const movesEl = document.getElementById('moves');
+const turnInfoEl = document.getElementById('turnInfo');
+
+let board = null;
+let game = null;
+let config = {
+  draggable: true,
+  position: 'start',
+  onDragStart: onDragStart,
+  onDrop: onDrop,
+  onSnapEnd: onSnapEnd,
+  onMouseoverSquare: onMouseoverSquare,
+  onMouseoutSquare: onMouseoutSquare,
+  pieceTheme: 'https://unpkg.com/chessboardjs@1.0.0/img/chesspieces/wikipedia/{piece}.png'
+};
+
+const pieceValues = { p:100, n:320, b:330, r:500, q:900, k:20000 };
+
+// piece-square tables (simple small bonuses for positioning)
+const pst = {
+  p: [
+    0,  0,  0,  0,  0,  0,  0,  0,
+    5, 10, 10,-20,-20, 10, 10,  5,
+    5, -5,-10,  0,  0,-10, -5,  5,
+    0,  0,  0, 20, 20,  0,  0,  0,
+    5,  5, 10, 25, 25, 10,  5,  5,
+   10, 10, 20, 30, 30, 20, 10, 10,
+   50, 50, 50, 50, 50, 50, 50, 50,
+    0,  0,  0,  0,  0,  0,  0,  0
+  ],
+  n: [
+   -50,-40,-30,-30,-30,-30,-40,-50,
+   -40,-20,  0,  5,  5,  0,-20,-40,
+   -30,  5, 10, 15, 15, 10,  5,-30,
+   -30,  0, 15, 20, 20, 15,  0,-30,
+   -30,  5, 15, 20, 20, 15,  5,-30,
+   -30,  0, 10, 15, 15, 10,  0,-30,
+   -40,-20,  0,  0,  0,  0,-20,-40,
+   -50,-40,-30,-30,-30,-30,-40,-50
+  ],
+  b: [
+   -20,-10,-10,-10,-10,-10,-10,-20,
+   -10,  5,  0,  0,  0,  0,  5,-10,
+   -10, 10, 10, 10, 10, 10, 10,-10,
+   -10,  0, 10, 10, 10, 10,  0,-10,
+   -10,  5,  5, 10, 10,  5,  5,-10,
+   -10,  0,  5, 10, 10,  5,  0,-10,
+   -10,  0,  0,  0,  0,  0,  0,-10,
+   -20,-10,-10,-10,-10,-10,-10,-20
+  ],
+  r: [
+     0,  0,  5, 10, 10,  5,  0,  0,
+     0,  0,  5, 10, 10,  5,  0,  0,
+     0,  0,  5, 10, 10,  5,  0,  0,
+     0,  0,  5, 10, 10,  5,  0,  0,
+     0,  0,  5, 10, 10,  5,  0,  0,
+     0,  0,  5, 10, 10,  5,  0,  0,
+    25, 25, 25, 25, 25, 25, 25, 25,
+     0,  0,  5, 10, 10,  5,  0,  0
+  ],
+  q: [
+   -20,-10,-10, -5, -5,-10,-10,-20,
+   -10,  0,  0,  0,  0,  0,  0,-10,
+   -10,  0,  5,  5,  5,  5,  0,-10,
+    -5,  0,  5,  5,  5,  5,  0, -5,
+     0,  0,  5,  5,  5,  5,  0, -5,
+   -10,  5,  5,  5,  5,  5,  0,-10,
+   -10,  0,  5,  0,  0,  0,  0,-10,
+   -20,-10,-10, -5, -5,-10,-10,-20
+  ],
+  k: [
+   -30,-40,-40,-50,-50,-40,-40,-30,
+   -30,-40,-40,-50,-50,-40,-40,-30,
+   -30,-40,-40,-50,-50,-40,-40,-30,
+   -30,-40,-40,-50,-50,-40,-40,-30,
+   -20,-30,-30,-40,-40,-30,-30,-20,
+   -10,-20,-20,-20,-20,-20,-20,-10,
+    20, 20,  0,  0,  0,  0, 20, 20,
+    20, 30, 10,  0,  0, 10, 30, 20
+  ]
+};
+
+// Convert chess.js square ('a1'..'h8') to 0..63 index for pst lookup
+function squareToIndex(sq){
+  const file = sq.charCodeAt(0) - 'a'.charCodeAt(0);
+  const rank = parseInt(sq.charAt(1),10) - 1; // 0..7 (1 -> 0)
+  // pst tables are from white's perspective starting at a8 index 0; convert accordingly:
+  // index = (7-rank)*8 + file
+  return (7 - rank) * 8 + file;
+}
+
+// Evaluate position from White's perspective (positive = good for white)
+function evaluateBoard(boardState){
+  const fen = boardState.fen();
+  const turn = boardState.turn(); // 'w' or 'b'
+  let score = 0;
+  const pieces = boardState.board();
+  for(let r=0;r<8;r++){
+    for(let f=0;f<8;f++){
+      const p = pieces[r][f];
+      if(p){
+        const sq = String.fromCharCode('a'.charCodeAt(0)+f) + (8 - r);
+        const idx = squareToIndex(sq);
+        const val = pieceValues[p.type] || 0;
+        const pstVal = (pst[p.type] && pst[p.type][idx]) ? pst[p.type][idx] : 0;
+        const side = p.color === 'w' ? 1 : -1;
+        score += side * (val + pstVal);
+      }
+    }
+  }
+  return score;
+}
+
+// Minimax with alpha-beta; returns {bestMove, score}
+function minimaxRoot(depth, boardState, isMaximizingPlayer){
+  const moves = boardState.moves({verbose:true});
+  if(moves.length === 0){
+    return {bestMove: null, score: boardState.in_checkmate() ? (boardState.turn() === 'w' ? -999999 : 999999) : 0};
+  }
+  let bestScore = isMaximizingPlayer ? -Infinity : Infinity;
+  let bestMove = moves[0];
+  for(const mv of moves){
+    boardState.move(mv.san);
+    const score = minimax(depth-1, boardState, -Infinity, Infinity, !isMaximizingPlayer);
+    boardState.undo();
+    if(isMaximizingPlayer && score > bestScore){
+      bestScore = score;
+      bestMove = mv;
+    }
+    if(!isMaximizingPlayer && score < bestScore){
+      bestScore = score;
+      bestMove = mv;
+    }
+  }
+  return {bestMove, score: bestScore};
+}
+
+function minimax(depth, boardState, alpha, beta, isMaximizingPlayer){
+  if(depth === 0){
+    return evaluateBoard(boardState);
+  }
+  const moves = boardState.moves({verbose:true});
+  if(moves.length === 0){
+    if(boardState.in_checkmate()){
+      return boardState.turn() === 'w' ? -999999 : 999999;
+    }
+    return 0; // stalemate
+  }
+  if(isMaximizingPlayer){
+    let maxEval = -Infinity;
+    for(const mv of moves){
+      boardState.move(mv.san);
+      const evalScore = minimax(depth-1, boardState, alpha, beta, false);
+      boardState.undo();
+      if(evalScore > maxEval) maxEval = evalScore;
+      if(evalScore > alpha) alpha = evalScore;
+      if(beta <= alpha) break; // beta cutoff
+    }
+    return maxEval;
+  } else {
+    let minEval = Infinity;
+    for(const mv of moves){
+      boardState.move(mv.san);
+      const evalScore = minimax(depth-1, boardState, alpha, beta, true);
+      boardState.undo();
+      if(evalScore < minEval) minEval = evalScore;
+      if(evalScore < beta) beta = evalScore;
+      if(beta <= alpha) break; // alpha cutoff
+    }
+    return minEval;
+  }
+}
+
+// UI and interaction handlers
+function onDragStart(source, piece, position, orientation){
+  if(game.game_over()) return false;
+  const playAs = document.getElementById('playAs').value;
+  // prevent dragging opponent's pieces
+  if((game.turn() === 'w' && piece.charAt(0) === 'b' && playAs === 'w') ||
+     (game.turn() === 'b' && piece.charAt(0) === 'w' && playAs === 'b')){
+    return false;
+  }
+  return true;
+}
+
+let highlightedSquares = [];
+
+function removeHighlights(){
+  for(const sq of highlightedSquares){
+    const el = document.querySelector('.square-' + sq);
+    if(el) el.style.boxShadow = '';
+  }
+  highlightedSquares = [];
+}
+
+function onMouseoverSquare(square, piece){
+  removeHighlights();
+  // highlight legal moves from this square
+  const moves = game.moves({square: square, verbose: true});
+  if(moves.length === 0) return;
+  for(const m of moves){
+    const el = document.querySelector('.square-' + m.to);
+    if(el){ el.style.boxShadow = 'inset 0 0 0 4px rgba(63, 195, 128, 0.35)'; highlightedSquares.push(m.to); }
+  }
+  // highlight source
+  const el = document.querySelector('.square-' + square);
+  if(el){ el.style.boxShadow = 'inset 0 0 0 4px rgba(100, 149, 237, 0.35)'; highlightedSquares.push(square); }
+}
+
+function onMouseoutSquare(){
+  removeHighlights();
+}
+
+function onDrop(source, target){
+  removeHighlights();
+  // attempt move
+  const promotion = 'q'; // auto-queen
+  const move = game.move({from: source, to: target, promotion});
+  if(move === null){
+    return 'snapback';
+  } else {
+    logMove(move);
+    updateStatus();
+    window.setTimeout(function(){
+      maybeAIMove();
+    }, 200);
+  }
+}
+
+function onSnapEnd(){
+  board.position(game.fen());
+}
+
+// Game control
+function startNewGame(){
+  const playAs = document.getElementById('playAs').value;
+  const orientation = playAs === 'w' ? 'white' : 'black';
+  game = new Chess();
+  board.position(game.fen());
+  board.orientation(orientation);
+  clearLog();
+  updateStatus();
+  // if player chooses to play black, AI as white should move first
+  if(playAs === 'b'){
+    window.setTimeout(()=>maybeAIMove(), 300);
+  }
+}
+
+function maybeAIMove(){
+  if(game.game_over()) return;
+  const playAs = document.getElementById('playAs').value;
+  const aiColor = playAs === 'w' ? 'b' : 'w';
+  if(game.turn() !== aiColor) return;
+  // compute AI move
+  const depth = Number(document.getElementById('aiDepth').value);
+  const isMax = aiColor === 'w' ? true : false;
+  setStatus('AI thinking...');
+  // small delay for UX
+  setTimeout(()=> {
+    const res = minimaxRoot(depth, game, isMax);
+    if(res.bestMove){
+      game.move(res.bestMove.san);
+      logMove(res.bestMove);
+      board.position(game.fen());
+      updateStatus();
+    } else {
+      updateStatus();
+    }
+  }, 80);
+}
+
+function updateStatus(){
+  let status = '';
+  const turn = game.turn() === 'w' ? 'White' : 'Black';
+  turnInfoEl.textContent = 'Turn: ' + turn;
+  if(game.in_checkmate()){
+    status = 'Checkmate. ' + (game.turn() === 'w' ? 'Black' : 'White') + ' wins.';
+  } else if(game.in_draw()){
+    status = 'Draw.';
+  } else {
+    status = turn + ' to move' + (game.in_check() ? ' — CHECK' : '');
+  }
+  setStatus(status);
+  renderMoves();
+}
+
+function setStatus(s){
+  statusEl.textContent = 'Status: ' + s;
+}
+
+function logMove(move){
+  // move: verbose object or move from minimaxRoot
+  let san = move.san || (move.from + '-' + move.to);
+  const ply = (game.history().length);
+  movelogEl.innerHTML = `<div>#${ply} ${san}</div>` + movelogEl.innerHTML;
+  renderMoves();
+}
+
+function clearLog(){
+  movelogEl.innerHTML = '';
+  movesEl.innerHTML = 'No moves yet.';
+}
+
+function renderMoves(){
+  const hist = game.history({verbose:false});
+  if(hist.length === 0){ movesEl.innerHTML = 'No moves yet.'; return; }
+  let html = '';
+  for(let i=0;i<hist.length;i+=2){
+    const moveNum = (i/2)+1;
+    const white = hist[i] || '';
+    const black = hist[i+1] || '';
+    html += `<div style="margin-bottom:6px"><strong>${moveNum}.</strong> ${white} ${black}</div>`;
+  }
+  movesEl.innerHTML = html;
+}
+
+// Undo: undo last ply (both human and AI)
+function undoLast(){
+  if(!game) return;
+  game.undo();
+  board.position(game.fen());
+  updateStatus();
+  // also remove last log entry
+  if(movelogEl.firstChild) movelogEl.removeChild(movelogEl.firstChild);
+}
+
+// Resign
+function resign(){
+  if(!game) return;
+  const playAs = document.getElementById('playAs').value;
+  const humanColor = playAs === 'w' ? 'White' : 'Black';
+  const winner = humanColor === 'White' ? 'Black' : 'White';
+  setStatus(humanColor + ' resigned. ' + winner + ' wins.');
+}
+
+// Wire up UI
+document.getElementById('btnNew').addEventListener('click', startNewGame);
+document.getElementById('btnUndo').addEventListener('click', undoLast);
+document.getElementById('btnResign').addEventListener('click', resign);
+
+// initialize board
+board = Chessboard('board', config);
+game = new Chess();
+startNewGame();
+
+</script>
+</body>
+</html>
