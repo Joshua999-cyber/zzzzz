@@ -3,464 +3,50 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Monopoly Lite — Play vs AI</title>
+<title>Chess vs AI</title>
+
+<!-- chessboard.js CSS -->
+<link rel="stylesheet" href="https://unpkg.com/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css" />
 <style>
-  :root{
-    --board-bg:#0b6623;
-    --tile-bg:#f7f8f9;
-    --accent:#2b6cb0;
-    --danger:#d9534f;
-    --muted:#666;
-    --panel:#ffffffcc;
-    --glass: rgba(255,255,255,0.06);
-    --price:#0a6d0a;
-  }
-  html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#0f1724 0%, #071024 100%);color:#eef2f7}
-  .app {display:flex;flex-direction:row;gap:18px;padding:18px;box-sizing:border-box;height:100%;}
-  .left {width:820px; background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); padding:14px;border-radius:12px;box-shadow:0 6px 30px rgba(2,6,23,0.6);}
-  .right {flex:1;display:flex;flex-direction:column;gap:12px;}
-  h1{margin:0 0 10px 0;font-size:20px}
-  .board {width:100%;height:520px;background:var(--board-bg);border-radius:10px;padding:12px;box-sizing:border-box;display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(6,1fr);position:relative;}
-  .tile {background:var(--tile-bg);border-radius:6px;border:2px solid rgba(0,0,0,0.08);display:flex;flex-direction:column;justify-content:center;align-items:center;padding:6px;font-size:12px;text-align:center;box-shadow:inset 0 1px 0 rgba(255,255,255,0.4);}
-  .tile.property {cursor:pointer}
-  .tile.empty {background:linear-gradient(180deg,#eceff1,#f7f9fb)}
-  .tile.corner{grid-row:1 / span 1;grid-column:1 / span 1}
-  /* place tiles around grid by classes */
-  .pos-0{grid-row:6;grid-column:1}
-  .pos-1{grid-row:6;grid-column:2}
-  .pos-2{grid-row:6;grid-column:3}
-  .pos-3{grid-row:6;grid-column:4}
-  .pos-4{grid-row:6;grid-column:5}
-  .pos-5{grid-row:6;grid-column:6}
-  .pos-6{grid-row:5;grid-column:6}
-  .pos-7{grid-row:4;grid-column:6}
-  .pos-8{grid-row:3;grid-column:6}
-  .pos-9{grid-row:2;grid-column:6}
-  .pos-10{grid-row:1;grid-column:6}
-  .pos-11{grid-row:1;grid-column:5}
-  /* more positions reuse but simplified 12-tile circular board */}
-  .tile .title{font-weight:600;font-size:12px;margin-bottom:6px}
-  .tile .meta{font-size:11px;color:var(--muted)}
-  .prop-color {height:10px;width:100%;border-radius:3px;margin-bottom:6px}
-  .player-strip {display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap}
-  .chip{width:16px;height:16px;border-radius:50%;display:inline-block;border:2px solid #fff}
-  .player-panel {background:var(--panel);padding:10px;border-radius:8px;box-shadow:0 8px 24px rgba(2,6,23,0.5);color:#061220}
-  .player-row {display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:8px}
-  .controls {display:flex;gap:8px;align-items:center}
-  button {background:var(--accent);color:white;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
-  button.secondary{background:transparent;border:1px solid rgba(255,255,255,0.08);color:#e9eef7}
-  .log {background:rgba(0,0,0,0.4);padding:10px;border-radius:8px;height:180px;overflow:auto;font-size:13px}
-  .big {font-size:18px;font-weight:700}
-  .status {padding:10px;background:var(--glass);border-radius:8px;color:#e6f0ff}
-  .buy-box {display:flex;gap:8px;align-items:center;margin-top:8px}
-  .money {color:var(--price);font-weight:700}
-  .muted {color:var(--muted)}
-  .config {display:flex;gap:8px;align-items:center;margin-bottom:8px}
-  input[type=number]{width:70px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:#eef}
-  .tile-owner {font-size:11px;margin-top:6px}
-  .player-active {outline:3px solid rgba(255,255,255,0.06);box-shadow:0 6px 18px rgba(0,0,0,0.6)}
-  .center-overlay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;color:#fff;pointer-events:none}
-  .dice {width:44px;height:44px;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;color:#111}
-  .controls-row{display:flex;gap:8px;align-items:center}
-  .mini {font-size:12px;padding:6px 8px;border-radius:6px;background:rgba(255,255,255,0.06)}
-  .property-price {font-weight:700;color:#065f06}
-  .winner {font-size:18px;color:gold;font-weight:800}
-  @media(max-width:1000px){.app{flex-direction:column}.left{width:auto;height:auto}.board{height:420px}}
+  body{font-family:Inter,Segoe UI,Roboto,Arial,sans-serif;background:#0f1724;color:#eef2f7;margin:0;padding:18px;display:flex;justify-content:center}
+  .app{width:900px;display:flex;gap:18px}
+  .left{width:420px;background:#0b1220;padding:18px;border-radius:10px;box-shadow:0 10px 30px rgba(2,6,23,0.7)}
+  .right{flex:1;background:#071026;padding:18px;border-radius:10px;box-shadow:0 10px 30px rgba(2,6,23,0.7)}
+  h2{margin:0 0 10px 0;font-size:18px}
+  .board-wrap{width:400px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  button{background:#1f6feb;border:0;padding:8px 12px;border-radius:8px;color:#fff;font-weight:700;cursor:pointer}
+  button.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+  .status{margin-top:12px;padding:10px;background:rgba(255,255,255,0.02);border-radius:8px;color:#cfe8ff}
+  .muted{color:#9fb2c9}
+  .log{margin-top:12px;height:200px;overflow:auto;background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;font-size:13px}
+  .small{font-size:13px;color:#cfe8ff}
+  .select{padding:6px;border-radius:6px;background:transparent;border:1px solid rgba(255,255,255,0.06);color:#eaf6ff}
+  .ai-strength{width:70px}
+  /* override chessboard piece colors: white pieces light, black pieces dark */
+  .white-1e1d7 .piece-417db { filter: none; } /* placeholder to avoid theme conflicts */
+  /* ensure board background matches theme */
+  .board { box-shadow: 0 8px 20px rgba(0,0,0,0.6); border-radius:6px; }
 </style>
 </head>
 <body>
-<div class="app" role="application">
+<div class="app" role="application" aria-label="Chess vs AI application">
   <div class="left">
-    <h1>Monopoly Lite — Play vs AI</h1>
-    <div class="config">
-      <label class="mini">AI players:
-        <select id="aiCount">
+    <h2>Chess vs AI</h2>
+    <div class="board-wrap">
+      <div id="board" style="width:400px"></div>
+    </div>
+
+    <div class="controls">
+      <label class="small">Play as:
+        <select id="playAs" class="select">
+          <option value="w" selected>White</option>
+          <option value="b">Black</option>
+        </select>
+      </label>
+      <label class="small">AI depth:
+        <select id="aiDepth" class="select ai-strength">
           <option value="1">1</option>
           <option value="2" selected>2</option>
           <option value="3">3</option>
         </select>
-      </label>
-      <label class="mini">Starting cash:
-        <input id="startCash" type="number" value="1500" min="200" step="100" />
-      </label>
-      <button id="btnNew">New Game</button>
-      <button id="btnReset" class="secondary">Reset Board</button>
-    </div>
-
-    <div class="board" id="board" aria-label="Monopoly board">
-      <!-- 12 tiles placed manually -->
-      <!-- Positions 0..11 -->
-      <div class="tile pos-0 property" data-pos="0"><div class="prop-color" style="background:#e74c3c"></div><div class="title">Mediterranean</div><div class="meta">Price: <span class="property-price">60</span></div><div class="tile-owner muted">Unowned</div></div>
-      <div class="tile pos-1 property" data-pos="1"><div class="prop-color" style="background:#3498db"></div><div class="title">Baltic</div><div class="meta">Price: <span class="property-price">60</span></div><div class="tile-owner muted">Unowned</div></div>
-      <div class="tile pos-2 property" data-pos="2"><div class="prop-color" style="background:#2ecc71"></div><div class="title">Oriental</div><div class="meta">Price: <span class="property-price">100</span></div><div class="tile-owner muted">Unowned</div></div>
-      <div class="tile pos-3 property" data-pos="3"><div class="prop-color" style="background:#f1c40f"></div><div class="title">Vermont</div><div class="meta">Price: <span class="property-price">100</span></div><div class="tile-owner muted">Unowned</div></div>
-      <div class="tile pos-4 property" data-pos="4"><div class="prop-color" style="background:#9b59b6"></div><div class="title">Connecticut</div><div class="meta">Price: <span class="property-price">120</span></div><div class="tile-owner muted">Unowned</div></div>
-      <div class="tile pos-5 property" data-pos="5"><div class="prop-color" style="background:#34495e"></div><div class="title">St. Charles</div><div class="meta">Price: <span class="property-price">140</span></div><div class="tile-owner muted">Unowned</div></div>
-      <div class="tile pos-6 property" data-pos="6"><div class="prop-color" style="background:#e67e22"></div><div class="title">States</div><div class="meta">Price: <span class="property-price">140</span></div><div class="tile-owner muted">Unowned</div></div>
-      <div class="tile pos-7 property" data-pos="7"><div class="prop-color" style="background:#1abc9c"></div><div class="title">Virginia</div><div class="meta">Price: <span class="property-price">160</span></div><div class="tile-owner muted">Unowned</div></div>
-      <div class="tile pos-8 property" data-pos="8"><div class="prop-color" style="background:#e84393"></div><div class="title">St. James</div><div class="meta">Price: <span class="property-price">180</span></div><div class="tile-owner muted">Unowned</div></div>
-      <div class="tile pos-9 property" data-pos="9"><div class="prop-color" style="background:#00a8ff"></div><div class="title">Tennessee</div><div class="meta">Price: <span class="property-price">180</span></div><div class="tile-owner muted">Unowned</div></div>
-      <div class="tile pos-10 property" data-pos="10"><div class="prop-color" style="background:#ff7675"></div><div class="title">New York</div><div class="meta">Price: <span class="property-price">200</span></div><div class="tile-owner muted">Unowned</div></div>
-      <div class="tile pos-11 property" data-pos="11"><div class="prop-color" style="background:#6c5ce7"></div><div class="title">Kentucky</div><div class="meta">Price: <span class="property-price">220</span></div><div class="tile-owner muted">Unowned</div></div>
-
-      <div class="center-overlay">
-        <div class="big">Monopoly Lite</div>
-        <div class="muted">Simplified rules — buy properties, pay rent, go bankrupt</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="right">
-    <div class="player-panel" id="playersPanel">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div><strong>Players</strong></div>
-        <div class="muted">Turn: <span id="turnIndex">-</span></div>
-      </div>
-      <div id="playersList" style="margin-top:8px;display:flex;flex-direction:column;gap:8px"></div>
-    </div>
-
-    <div class="player-panel status" id="statusPanel">
-      <div id="statusText">Click New Game to start.</div>
-    </div>
-
-    <div class="player-panel">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <strong>Controls</strong>
-        <div class="muted">Dice & actions</div>
-      </div>
-      <div class="controls-row">
-        <div style="display:flex;gap:8px;align-items:center">
-          <div class="dice" id="dieA">-</div>
-          <div class="dice" id="dieB">-</div>
-        </div>
-        <div class="controls">
-          <button id="btnRoll">Roll Dice</button>
-          <button id="btnEnd" class="secondary">End Turn</button>
-        </div>
-      </div>
-      <div id="buyArea" style="margin-top:10px"></div>
-    </div>
-
-    <div class="player-panel">
-      <strong>Game Log</strong>
-      <div class="log" id="log"></div>
-    </div>
-  </div>
-</div>
-
-<script>
-/*
-  Monopoly Lite
-  - 12 tiles (0..11) circular
-  - Players: human + N AIs (configurable)
-  - Turn order: simple round-robin
-  - Actions: roll dice, move, buy property when landed and unowned, pay rent if owned
-  - AI: simple heuristic "buy if cash after buy >= reserve"
-  - Bankruptcy: player removed when cash < 0
-  - Winner: last non-bankrupt player
-*/
-
-const TILE_COUNT = 12;
-const PROPERTY_DEFS = [
-  {name:'Mediterranean', price:60, rent:10},
-  {name:'Baltic', price:60, rent:10},
-  {name:'Oriental', price:100, rent:14},
-  {name:'Vermont', price:100, rent:14},
-  {name:'Connecticut', price:120, rent:18},
-  {name:'St. Charles', price:140, rent:20},
-  {name:'States', price:140, rent:20},
-  {name:'Virginia', price:160, rent:22},
-  {name:'St. James', price:180, rent:24},
-  {name:'Tennessee', price:180, rent:24},
-  {name:'New York', price:200, rent:28},
-  {name:'Kentucky', price:220, rent:32},
-];
-
-let game = null;
-
-// Utilities
-function $id(id){return document.getElementById(id)}
-function randInt(min,max){return Math.floor(Math.random()*(max-min+1))+min}
-function log(msg){const el=$id('log');el.innerHTML = `<div>${msg}</div>` + el.innerHTML; while(el.children.length>200) el.removeChild(el.lastChild);}
-
-// Game setup and state
-function newGame(aiCount=2, startCash=1500){
-  const players = [];
-  players.push({id:0,name:'You',isAI:false,pos:0,cash:startCash,properties:[],bankrupt:false,chip:'#ffcc00'});
-  for(let i=1;i<=aiCount;i++){
-    players.push({id:i,name:'AI '+i,isAI:true,pos:0,cash:startCash,properties:[],bankrupt:false,chip:aiColor(i)});
-  }
-  const tiles = PROPERTY_DEFS.map((p,i)=>({
-    id:i, owner:null, name:p.name, price:p.price, rent:p.rent
-  }));
-  game = {
-    players, tiles, current:0, lastRoll:[0,0], started:true, turnCount:0
-  };
-  updateUI();
-  log('New game started. Good luck!');
-  setStatus('Game ready — press Roll Dice to start your turn.');
-}
-
-function aiColor(i){
-  const list = ['#1abc9c','#e74c3c','#3498db','#9b59b6','#f39c12'];
-  return list[(i-1)%list.length];
-}
-
-// UI update
-function updateBoardTiles(){
-  document.querySelectorAll('.tile').forEach(el=>{
-    const pos = Number(el.getAttribute('data-pos'));
-    const tile = game.tiles[pos];
-    el.querySelector('.title').textContent = tile.name;
-    el.querySelector('.property-price').textContent = tile.price;
-    const ownerEl = el.querySelector('.tile-owner');
-    if(tile.owner==null){ ownerEl.textContent = 'Unowned'; ownerEl.classList.add('muted')}
-    else {
-      const p = game.players.find(x=>x.id===tile.owner);
-      ownerEl.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.chip};margin-right:6px;vertical-align:middle;"></span>${p.name}`;
-      ownerEl.classList.remove('muted')
-    }
-    el.classList.toggle('owned', tile.owner!=null);
-  });
-}
-
-function updatePlayersPanel(){
-  const list = $id('playersList');
-  list.innerHTML = '';
-  game.players.forEach(p=>{
-    const div = document.createElement('div');
-    div.className = 'player-row';
-    div.style.borderLeft = `6px solid ${p.chip}`;
-    if(p.bankrupt){ div.style.opacity = 0.45; }
-    if(game.current===p.id) div.classList.add('player-active');
-    div.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="width:36px;display:flex;flex-direction:column;align-items:center">
-          <div class="chip" style="background:${p.chip}"></div>
-          <div style="font-size:11px;margin-top:4px" class="muted">#${p.id}</div>
-        </div>
-        <div>
-          <div style="font-weight:700">${p.name} ${p.isAI?'<span class="muted"> (AI)</span>':''}</div>
-          <div class="muted" style="font-size:12px">Pos: ${p.pos} • Properties: ${p.properties.length}</div>
-        </div>
-      </div>
-      <div style="text-align:right">
-        <div class="money">$${p.cash}</div>
-        ${p.bankrupt?'<div class="muted">Bankrupt</div>':''}
-      </div>
-    `;
-    list.appendChild(div);
-  });
-  $id('turnIndex').textContent = game.players[game.current].name;
-}
-
-function setStatus(txt){
-  $id('statusText').textContent = txt;
-}
-
-function updateUI(){
-  updateBoardTiles();
-  updatePlayersPanel();
-  $id('dieA').textContent = game.lastRoll[0] || '-';
-  $id('dieB').textContent = game.lastRoll[1] || '-';
-}
-
-// Turn and actions
-function rollDice(){
-  const player = game.players[game.current];
-  if(player.bankrupt){ setStatus(`${player.name} is bankrupt. Ending turn.`); endTurn(); return; }
-  if(player.isAI){ setStatus(`Waiting for AI ${player.name}...`); return; }
-  const a = randInt(1,6), b = randInt(1,6);
-  game.lastRoll = [a,b];
-  movePlayer(player, a+b);
-  $id('dieA').textContent = a;
-  $id('dieB').textContent = b;
-  setStatus(`${player.name} rolled ${a}+${b} = ${a+b}`);
-  processLanding(player);
-  updateUI();
-  if(player.isAI){ setTimeout(()=>aiTakeTurn(player),500); }
-}
-
-function movePlayer(player, steps){
-  player.pos = (player.pos + steps) % TILE_COUNT;
-  log(`${player.name} moves ${steps} to ${game.tiles[player.pos].name}`);
-}
-
-function processLanding(player){
-  const tile = game.tiles[player.pos];
-  if(tile.owner==null){
-    if(!player.isAI){
-      showBuyOffer(player,tile);
-    } else {
-      // AI decision
-      const buy = aiDecideBuy(player,tile);
-      if(buy) {
-        buyProperty(player, tile);
-        log(`${player.name} (AI) bought ${tile.name} for $${tile.price}`);
-      } else {
-        log(`${player.name} (AI) passed on ${tile.name}`);
-      }
-    }
-  } else if(tile.owner !== player.id){
-    // pay rent
-    const owner = game.players.find(p=>p.id===tile.owner);
-    const rent = tile.rent;
-    player.cash -= rent;
-    owner.cash += rent;
-    log(`${player.name} paid $${rent} rent to ${owner.name} for ${tile.name}`);
-    checkBankruptcy(player);
-  } else {
-    log(`${player.name} landed on their own property (${tile.name}).`);
-  }
-  updateUI();
-  checkWinCondition();
-}
-
-function showBuyOffer(player,tile){
-  const area = $id('buyArea');
-  area.innerHTML = `
-    <div class="buy-box">
-      <div><strong>Buy ${tile.name}?</strong> <div class="muted">Price: <span class="property-price">$${tile.price}</span></div></div>
-      <div style="margin-left:auto;display:flex;gap:8px">
-        <button id="btnBuy">Buy</button>
-        <button id="btnPass" class="secondary">Pass</button>
-      </div>
-    </div>
-  `;
-  $id('btnBuy').onclick = ()=>{ buyProperty(player,tile); area.innerHTML=''; updateUI(); checkWinCondition(); };
-  $id('btnPass').onclick = ()=>{ area.innerHTML=''; log(`${player.name} passed on ${tile.name}`); };
-}
-
-function buyProperty(player,tile){
-  if(tile.owner!=null) return;
-  if(player.cash < tile.price){ log(`${player.name} cannot afford ${tile.name}`); return; }
-  player.cash -= tile.price;
-  player.properties.push(tile.id);
-  tile.owner = player.id;
-  updateBoardTiles();
-  updatePlayersPanel();
-}
-
-function checkBankruptcy(player){
-  if(player.cash < 0){
-    // transfer properties to bank (unowned) and mark bankrupt
-    player.bankrupt = true;
-    player.properties.forEach(pid => { game.tiles[pid].owner = null; });
-    player.properties = [];
-    log(`${player.name} went bankrupt and is out of the game.`);
-    // if human bankrupt, disable controls
-    if(!player.isAI) setStatus('You are bankrupt. Game over for you.');
-    updateBoardTiles();
-    updatePlayersPanel();
-  }
-}
-
-function nextActiveIndex(from){
-  const n = game.players.length;
-  for(let i=1;i<=n;i++){
-    const idx = (from + i) % n;
-    const p = game.players[idx];
-    if(!p.bankrupt) return idx;
-  }
-  return null;
-}
-
-function endTurn(){
-  // hide buy area
-  $id('buyArea').innerHTML = '';
-  game.turnCount++;
-  const next = nextActiveIndex(game.current);
-  if(next==null){ setStatus('No active players remain.'); return; }
-  game.current = next;
-  setStatus(`${game.players[game.current].name}'s turn.`);
-  updateUI();
-  const cur = game.players[game.current];
-  if(cur.isAI && !cur.bankrupt){
-    setTimeout(()=>aiTakeTurn(cur), 600 + randInt(0,600));
-  }
-}
-
-function checkWinCondition(){
-  const alive = game.players.filter(p=>!p.bankrupt);
-  if(alive.length===1){
-    const w = alive[0];
-    setStatus(`Game over — winner: ${w.name}!`);
-    log(`Winner: ${w.name} with $${w.cash}`);
-    $id('btnRoll').disabled = true;
-    $id('btnEnd').disabled = true;
-  }
-}
-
-// AI behavior
-function aiDecideBuy(aiPlayer,tile){
-  // simple heuristic: buy if after buying, AI still has reserve (25% of starting cash) and not too many expensive properties
-  const reserve = Math.max(150, Math.floor(game.players[aiPlayer.id].cash * 0.25));
-  // prefer buying cheap properties or if they have few properties
-  const preferFactor = aiPlayer.properties.length < 3 ? 0.9 : 1.1;
-  const affordable = (aiPlayer.cash - tile.price) >= reserve;
-  const priceScore = 1 - (tile.price / 300);
-  return affordable && (priceScore * preferFactor > 0.2);
-}
-
-function aiTakeTurn(aiPlayer){
-  if(aiPlayer.bankrupt) { endTurn(); return; }
-  // roll dice automatically
-  const a = randInt(1,6), b = randInt(1,6);
-  game.lastRoll = [a,b];
-  movePlayer(aiPlayer, a+b);
-  log(`${aiPlayer.name} rolled ${a}+${b} = ${a+b}`);
-  processLanding(aiPlayer);
-  updateUI();
-  // small chance to attempt building very simple trades (not implemented) — skip
-  // end turn
-  setTimeout(()=>{ if(!aiPlayer.bankrupt) endTurn(); }, 700 + randInt(0,800));
-}
-
-// UI wiring
-$id('btnNew').addEventListener('click', ()=>{
-  const ai = Number($id('aiCount').value);
-  const start = Number($id('startCash').value) || 1500;
-  $id('btnRoll').disabled = false;
-  $id('btnEnd').disabled = false;
-  newGame(ai, start);
-});
-
-$id('btnReset').addEventListener('click', ()=>{
-  // reset tile owners and UI
-  if(!game) return;
-  game.tiles.forEach(t=>{ t.owner = null; });
-  game.players.forEach(p=>{ p.properties = []; p.cash = Number($id('startCash').value) || 1500; p.pos = 0; p.bankrupt=false; });
-  updateUI();
-  log('Board reset; all properties returned to bank.');
-  setStatus('Board reset.');
-});
-
-$id('btnRoll').addEventListener('click', ()=>{
-  if(!game){ setStatus('No game in progress. Click New Game.'); return; }
-  const player = game.players[game.current];
-  if(player.isAI){ setStatus('It is not your turn.'); return; }
-  if(player.bankrupt){ setStatus('You are bankrupt. End turn to continue.'); return; }
-  rollDice();
-});
-
-$id('btnEnd').addEventListener('click', ()=>{
-  if(!game){ setStatus('No game in progress.'); return; }
-  endTurn();
-});
-
-// Click tile to view details or attempt buy (human)
-document.querySelectorAll('.tile.property').forEach(el=>{
-  el.addEventListener('click', ()=>{
-    if(!game) return;
-    const pos = Number(el.getAttribute('data-pos'));
-    const tile = game.tiles[pos];
-    const ownerName = tile.owner==null ? 'Unowned' : game.players.find(p=>p.id===tile.owner).name;
-    alert(`${tile.name}\nPrice: $${tile.price}\nRent: $${tile.rent}\nOwner: ${ownerName}`);
-  });
-});
-
-// Initialize simple UI text
-setStatus('Ready. Configure and press New Game.');
-</script>
-</body>
-</html>
